@@ -20,7 +20,7 @@ func (s *normal) Commit() error {
 }
 
 func (s *normal) Exec(query string, args ...interface{}) (sql.Result, error) {
-	return s.Exec(query, args...)
+	return s.db.Exec(query, args...)
 }
 
 func (s *normal) Prepare(query string) (*sql.Stmt, error) {
