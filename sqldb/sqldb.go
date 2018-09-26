@@ -23,6 +23,8 @@ type SqlDatabase interface {
 	Delete(entity interface{}, filters ...SqlFilter) (uint64, error)
 	Update(entity interface{}, filters ...SqlFilter) (uint64, error)
 	UpdateSelective(entity interface{}, filters ...SqlFilter) (uint64, error)
+	UpdateByPrimaryKey(entity interface{}) (uint64, error)
+	UpdateSelectiveByPrimaryKey(entity interface{}) (uint64, error)
 	SelectCount(entity interface{}, filters ...SqlFilter) (uint64, error)
 	SelectOne(entity interface{}, filters ...SqlFilter) error
 	SelectDistinct(entity interface{}, row func(), order interface{}, filters ...SqlFilter) error
@@ -45,6 +47,8 @@ type SqlAccess interface {
 	Delete(entity interface{}, filters ...SqlFilter) (uint64, error)
 	Update(entity interface{}, filters ...SqlFilter) (uint64, error)
 	UpdateSelective(entity interface{}, filters ...SqlFilter) (uint64, error)
+	UpdateByPrimaryKey(entity interface{}) (uint64, error)
+	UpdateSelectiveByPrimaryKey(entity interface{}) (uint64, error)
 	SelectCount(entity interface{}, filters ...SqlFilter) (uint64, error)
 	SelectOne(entity interface{}, filters ...SqlFilter) error
 	SelectDistinct(entity interface{}, row func(), order interface{}, filters ...SqlFilter) error
@@ -57,6 +61,7 @@ type SqlField interface {
 	Value() interface{}
 	Address() interface{}
 	AutoIncrement() bool
+	PrimaryKey() bool
 	Filter() string
 	Order() string
 	ValueEmpty() bool

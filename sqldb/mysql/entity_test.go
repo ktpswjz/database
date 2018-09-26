@@ -128,7 +128,7 @@ type tabEntity21 struct {
 	TabEntity2
 	partsBase
 
-	UserID2 uint64 `sql:"userId2" auto:"true"`
+	UserID2 uint64 `sql:"userId2" auto:"true" primary:"true"`
 }
 
 func (s tabEntity21) TableName() string {

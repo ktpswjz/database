@@ -91,6 +91,14 @@ func (s *transaction) UpdateSelective(entity interface{}, filters ...sqldb.SqlFi
 	return s.update(s, true, entity, filters...)
 }
 
+func (s *transaction) UpdateByPrimaryKey(entity interface{}) (uint64, error) {
+	return s.updateByPrimaryKey(s, false, entity)
+}
+
+func (s *transaction) UpdateSelectiveByPrimaryKey(entity interface{}) (uint64, error) {
+	return s.updateByPrimaryKey(s, true, entity)
+}
+
 func (s *transaction) SelectOne(entity interface{}, filters ...sqldb.SqlFilter) error {
 	return s.selectOne(s, entity, filters...)
 }

@@ -252,6 +252,64 @@ func (s *access) update(sqlAccess sqldb.SqlAccess, selective bool, dbEntity inte
 	return uint64(rowsAffected), nil
 }
 
+func (s *access) updateByPrimaryKey(sqlAccess sqldb.SqlAccess, selective bool, dbEntity interface{}) (uint64, error) {
+	sqlEntity := &entity{}
+	err := sqlEntity.Parse(dbEntity)
+	if err != nil {
+		return 0, err
+	}
+
+	sqlBuilder := &builder{}
+	sqlBuilder.Reset()
+	sqlBuilder.Update(sqlEntity.Name())
+	fieldCount := sqlEntity.FieldCount()
+	primaryFields := make([]sqldb.SqlField, 0)
+	for fieldIndex := 0; fieldIndex < fieldCount; fieldIndex++ {
+		field := sqlEntity.Field(fieldIndex)
+		if field.PrimaryKey() {
+			primaryFields = append(primaryFields, field)
+			continue
+		}
+		if field.AutoIncrement() {
+			continue
+		}
+		if selective {
+			if field.ValueEmpty() {
+				continue
+			}
+		}
+
+		sqlBuilder.Set(field.Name(), field.Value())
+	}
+
+	primaryCount := len(primaryFields)
+	if primaryCount < 1 {
+		return 0, fmt.Errorf("no primary key")
+	}
+	for fieldIndex := 0; fieldIndex < primaryCount; fieldIndex++ {
+		field := primaryFields[fieldIndex]
+		sqlBuilder.Where(field.Name(), field.Value())
+	}
+
+	stmt, err := sqlAccess.Prepare(sqlBuilder.Query())
+	if err != nil {
+		return 0, err
+	}
+	defer stmt.Close()
+
+	result, err := stmt.Exec(sqlBuilder.Args()...)
+	if err != nil {
+		return 0, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+
+	return uint64(rowsAffected), nil
+}
+
 func (s *access) selectCount(sqlAccess sqldb.SqlAccess, tableName string, sqlFilters ...sqldb.SqlFilter) (uint64, error) {
 	sqlBuilder := &builder{}
 	sqlBuilder.Reset()

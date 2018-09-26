@@ -10,6 +10,7 @@ type field struct {
 	value         interface{}
 	address       interface{}
 	autoIncrement bool
+	primaryKey    bool
 	filter        string
 	order         string
 }
@@ -28,6 +29,10 @@ func (s *field) Address() interface{} {
 
 func (s *field) AutoIncrement() bool {
 	return s.autoIncrement
+}
+
+func (s *field) PrimaryKey() bool {
+	return s.primaryKey
 }
 
 func (s *field) Filter() string {

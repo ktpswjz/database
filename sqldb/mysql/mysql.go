@@ -138,6 +138,26 @@ func (s *mysql) UpdateSelective(entity interface{}, filters ...sqldb.SqlFilter) 
 	return sqlAccess.UpdateSelective(entity, filters...)
 }
 
+func (s *mysql) UpdateByPrimaryKey(entity interface{}) (uint64, error) {
+	sqlAccess, err := s.NewAccess(false)
+	if err != nil {
+		return 0, err
+	}
+	defer sqlAccess.Close()
+
+	return sqlAccess.UpdateByPrimaryKey(entity)
+}
+
+func (s *mysql) UpdateSelectiveByPrimaryKey(entity interface{}) (uint64, error) {
+	sqlAccess, err := s.NewAccess(false)
+	if err != nil {
+		return 0, err
+	}
+	defer sqlAccess.Close()
+
+	return sqlAccess.UpdateSelectiveByPrimaryKey(entity)
+}
+
 func (s *mysql) SelectOne(entity interface{}, filters ...sqldb.SqlFilter) error {
 	sqlAccess, err := s.NewAccess(false)
 	if err != nil {

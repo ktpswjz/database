@@ -59,6 +59,14 @@ func (s *normal) UpdateSelective(entity interface{}, filters ...sqldb.SqlFilter)
 	return s.update(s, true, entity, filters...)
 }
 
+func (s *normal) UpdateByPrimaryKey(entity interface{}) (uint64, error) {
+	return s.updateByPrimaryKey(s, false, entity)
+}
+
+func (s *normal) UpdateSelectiveByPrimaryKey(entity interface{}) (uint64, error) {
+	return s.updateByPrimaryKey(s, true, entity)
+}
+
 func (s *normal) SelectOne(entity interface{}, filters ...sqldb.SqlFilter) error {
 	return s.selectOne(s, entity, filters...)
 }

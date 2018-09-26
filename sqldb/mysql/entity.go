@@ -13,6 +13,7 @@ const (
 	sqlFieldFilterTagName        = "filter"
 	sqlFieldOrderTagName         = "order"
 	sqlFieldAutoIncrementTagName = "auto"
+	sqlFieldPrimaryKeyTagName    = "primary"
 
 	sqlFunTableTagName = "TableName"
 )
@@ -158,6 +159,9 @@ func (s *entity) parseFields(v reflect.Value, fields map[string]*field) {
 		if strings.ToLower(typeField.Tag.Get(sqlFieldAutoIncrementTagName)) == "true" {
 			info.autoIncrement = true
 		}
+		if strings.ToLower(typeField.Tag.Get(sqlFieldPrimaryKeyTagName)) == "true" {
+			info.primaryKey = true
+		}
 		filter := typeField.Tag.Get(sqlFieldFilterTagName)
 		if len(filter) > 0 {
 			info.filter = filter
@@ -220,6 +224,9 @@ func (s *entity) parseFilterFields(v reflect.Value) {
 		info.address = valueField.Addr().Interface()
 		if strings.ToLower(typeField.Tag.Get(sqlFieldAutoIncrementTagName)) == "true" {
 			info.autoIncrement = true
+		}
+		if strings.ToLower(typeField.Tag.Get(sqlFieldPrimaryKeyTagName)) == "true" {
+			info.primaryKey = true
 		}
 		filter := typeField.Tag.Get(sqlFieldFilterTagName)
 		if len(filter) > 0 {
