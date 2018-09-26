@@ -288,16 +288,18 @@ func (s *access) updateByPrimaryKey(sqlAccess sqldb.SqlAccess, selective bool, d
 	}
 	for fieldIndex := 0; fieldIndex < primaryCount; fieldIndex++ {
 		field := primaryFields[fieldIndex]
-		sqlBuilder.Where(field.Name(), field.Value())
+		sqlBuilder.Where(fmt.Sprintf(" %s=?", field.Name()), field.Value())
 	}
 
-	stmt, err := sqlAccess.Prepare(sqlBuilder.Query())
+	query := sqlBuilder.Query()
+	stmt, err := sqlAccess.Prepare(query)
 	if err != nil {
 		return 0, err
 	}
 	defer stmt.Close()
 
-	result, err := stmt.Exec(sqlBuilder.Args()...)
+	args := sqlBuilder.Args()
+	result, err := stmt.Exec(args...)
 	if err != nil {
 		return 0, err
 	}
@@ -305,6 +307,22 @@ func (s *access) updateByPrimaryKey(sqlAccess sqldb.SqlAccess, selective bool, d
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		return 0, err
+	}
+
+	if rowsAffected == 0 {
+		sqlBuilder.Reset()
+		sqlBuilder.Select("COUNT(*)", false).From(sqlEntity.Name())
+		for fieldIndex := 0; fieldIndex < primaryCount; fieldIndex++ {
+			field := primaryFields[fieldIndex]
+			sqlBuilder.Where(fmt.Sprintf(" %s=?", field.Name()), field.Value())
+		}
+
+		query := sqlBuilder.Query()
+		row := sqlAccess.QueryRow(query, sqlBuilder.Args()...)
+		err := row.Scan(&rowsAffected)
+		if err != nil {
+			return 0, err
+		}
 	}
 
 	return uint64(rowsAffected), nil
