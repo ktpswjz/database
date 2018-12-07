@@ -432,9 +432,6 @@ func (s *access) selectPage(sqlAccess sqldb.SqlAccess, dbEntity interface{}, pag
 		return nil
 	}
 
-	version := sqlAccess.Version()
-	fmt.Println("version:", version)
-
 	sqlBuilderOrder := &builder{}
 	sqlBuilderOrder.Reset()
 	s.fillOrder(sqlBuilderOrder, dbOrder)
@@ -462,6 +459,7 @@ func (s *access) selectPage(sqlAccess sqldb.SqlAccess, dbEntity interface{}, pag
 	sqlBuilder := &builder{}
 	sqlBuilder.Reset()
 
+	version := sqlAccess.Version()
 	if version < 2012 {
 		sqlBuilder.Append("SELECT ")
 		sqlBuilder.Append(sqlEntity.ScanFields())
