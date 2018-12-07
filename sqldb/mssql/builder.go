@@ -1,4 +1,4 @@
-package mysql
+package mssql
 
 import (
 	"fmt"
@@ -71,7 +71,7 @@ func (s *builder) From(query string) sqldb.SqlBuilder {
 
 func (s *builder) Value(filed string, value interface{}) sqldb.SqlBuilder {
 	s.insertFields = append(s.insertFields, filed)
-	s.insertPlaceholders = append(s.insertPlaceholders, "?")
+	s.insertPlaceholders = append(s.insertPlaceholders, s.argName())
 	s.args = append(s.args, value)
 
 	return s
@@ -79,10 +79,10 @@ func (s *builder) Value(filed string, value interface{}) sqldb.SqlBuilder {
 
 func (s *builder) Set(filed string, value interface{}) sqldb.SqlBuilder {
 	if s.hasSet {
-		s.query = append(s.query, fmt.Sprint(", ", filed, " = ?"))
+		s.query = append(s.query, fmt.Sprint(", ", filed, " = "), s.argName())
 	} else {
 		s.hasSet = true
-		s.query = append(s.query, fmt.Sprint("SET ", filed, " = ?"))
+		s.query = append(s.query, fmt.Sprint("SET ", filed, " = ", s.argName()))
 	}
 
 	if s.args == nil {
@@ -285,6 +285,10 @@ func (s *builder) formatArgs(args []interface{}) []interface{} {
 	return as
 }
 
+func (s *builder) argName() string {
+	return fmt.Sprintf("@p%d", len(s.args)+1)
+}
+
 func (s *builder) ArgName() string {
-	return "?"
+	return s.argName()
 }

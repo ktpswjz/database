@@ -1,8 +1,10 @@
-package mysql
+package mssql
 
 import (
 	"database/sql"
 	"github.com/ktpswjz/database/sqldb"
+	"strconv"
+	"strings"
 )
 
 type normal struct {
@@ -20,6 +22,20 @@ func (s *normal) Commit() error {
 }
 
 func (s *normal) Version() int {
+	version := ""
+	err := s.db.QueryRow("SELECT @@VERSION").Scan(&version)
+	if err != nil {
+		return 0
+	}
+
+	vs := strings.Split(version, " ")
+	if len(vs) > 3 {
+		v, err := strconv.Atoi(vs[3])
+		if err == nil {
+			return v
+		}
+	}
+
 	return 0
 }
 

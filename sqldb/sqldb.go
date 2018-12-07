@@ -35,6 +35,7 @@ type SqlDatabase interface {
 type SqlAccess interface {
 	Close() error
 	Commit() error
+	Version() int
 
 	Exec(query string, args ...interface{}) (sql.Result, error)
 	Prepare(query string) (*sql.Stmt, error)
@@ -81,6 +82,7 @@ type SqlEntity interface {
 type SqlBuilder interface {
 	Query() string
 	Args() []interface{}
+	ArgName() string
 
 	Reset() SqlBuilder
 	Select(query string, distinct bool) SqlBuilder

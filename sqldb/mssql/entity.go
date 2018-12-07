@@ -1,4 +1,4 @@
-package mysql
+package mssql
 
 import (
 	"errors"
@@ -110,7 +110,7 @@ func (s *entity) parseName(v reflect.Value) error {
 	if len(result) != 1 {
 		return newError("get table name of '", v.Type().Name(), "' fail")
 	}
-	s.name = fmt.Sprintf("`%s`", result[0].String())
+	s.name = fmt.Sprintf("[%s]", result[0].String())
 	if s.name == "``" {
 		return newError("invalid entity (", v.Type().Name(), "): table name is empty")
 	}
@@ -159,7 +159,7 @@ func (s *entity) parseFields(v reflect.Value, fields map[string]*field) {
 			continue
 		}
 
-		info := field{name: fmt.Sprintf("`%s`", fieldName), filter: "=", order: "ASC"}
+		info := field{name: fmt.Sprintf("[%s]", fieldName), filter: "=", order: "ASC"}
 		info.value = valueField.Interface()
 		info.address = valueField.Addr().Interface()
 		if strings.ToLower(typeField.Tag.Get(sqlFieldAutoIncrementTagName)) == "true" {
@@ -232,7 +232,7 @@ func (s *entity) parseFilterFields(v reflect.Value) {
 			continue
 		}
 
-		info := field{name: fmt.Sprintf("`%s`", fieldName), filter: "=", order: "ASC"}
+		info := field{name: fmt.Sprintf("[%s]", fieldName), filter: "=", order: "ASC"}
 		info.value = valueField.Interface()
 		info.address = valueField.Addr().Interface()
 		if strings.ToLower(typeField.Tag.Get(sqlFieldAutoIncrementTagName)) == "true" {
