@@ -2,7 +2,9 @@ package mssql
 
 import (
 	"fmt"
-	"strings"
+	"github.com/ktpswjz/database/sqldb"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -18,6 +20,79 @@ func TestTest(t *testing.T) {
 	}
 
 	t.Log("version: ", dbVer)
+}
+
+func TestMssql_Tables(t *testing.T) {
+	db := &mssql{
+		connection: testConnection(),
+	}
+	tables, err := db.Tables()
+	if err != nil {
+		t.Fatal(err)
+	}
+	count := len(tables)
+	t.Log("count:", count)
+	for i := 0; i < count; i++ {
+		t.Logf("%2d %+v", i+1, tables[i])
+	}
+}
+
+func TestMssql_Views(t *testing.T) {
+	db := &mssql{
+		connection: testConnection(),
+	}
+	views, err := db.Views()
+	if err != nil {
+		t.Fatal(err)
+	}
+	count := len(views)
+	t.Log("count:", count)
+	for i := 0; i < count; i++ {
+		t.Logf("%2d %+v", i+1, views[i])
+	}
+}
+
+func TestMssql_Columns(t *testing.T) {
+	db := &mssql{
+		connection: testConnection(),
+	}
+	tableName := "Admission"
+	columns, err := db.Columns(tableName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	count := len(columns)
+	t.Log("count:", count)
+	for i := 0; i < count; i++ {
+		t.Logf("%2d %+v", i+1, columns[i])
+	}
+}
+
+func TestMssql_TableDefinition(t *testing.T) {
+	db := &mssql{
+		connection: testConnection(),
+	}
+	table := &sqldb.SqlTable{
+		Name:        "AdmissionTest",
+		Description: "dd",
+	}
+	definition, err := db.TableDefinition(table)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log("definition:", definition)
+}
+
+func TestMssql_ViewDefinition(t *testing.T) {
+	db := &mssql{
+		connection: testConnection(),
+	}
+	viewName := "ViewAdmission"
+	definition, err := db.ViewDefinition(viewName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log("definition:", definition)
 }
 
 func TestMssql_Version(t *testing.T) {
@@ -61,58 +136,32 @@ func TestMssql_SelectPage(t *testing.T) {
 	}
 }
 
-func testConnection() *databaseMssql {
-	return &databaseMssql{
-		Server:   "172.16.99.61",
+func testConnection() *Connection {
+	goPath := os.Getenv("GOPATH")
+	cfgPath := filepath.Join(goPath, "tmp", "cfg", "database_mssql_test.json")
+	cfg := &Connection{
+		Server:   "127.0.0.1",
 		Port:     1433,
-		Schema:   "HypertensionDB",
+		Schema:   "test",
 		Instance: "MSSQLSERVER",
 		User:     "sa",
-		Password: "Sql2018",
-		TimeOut:  10,
+		Password: "",
+		Timeout:  10,
 	}
-}
-
-type databaseMssql struct {
-	Server   string `json:"server"`   // 服务器名称或IP, 默认127.0.0.1
-	Port     int    `json:"port"`     // 服务器端口, 默认3306
-	Instance string `json:"instance"` // 数据库实例, 默认MSSQLSERVER
-	Schema   string `json:"schema"`   // 数据库名称
-	User     string `json:"user"`     // 登录名
-	Password string `json:"password"` // 登陆密码
-	TimeOut  int    `json:"timeOut" note:"连接超时时间，单位秒，默认10"`
-}
-
-func (s *databaseMssql) DriverName() string {
-	return "sqlserver"
-}
-
-func (s *databaseMssql) SourceName() string {
-	// sqlserver://username:password@host/instance?param1=value&param2=value
-	// sqlserver://sa@localhost/SQLExpress?database=master&connection+timeout=30 // `SQLExpress instance
-	sb := strings.Builder{}
-	sb.WriteString("sqlserver://")
-	sb.WriteString(s.User)
-	sb.WriteString(":")
-	sb.WriteString(s.Password)
-	sb.WriteString("@")
-	sb.WriteString(s.Server)
-	sb.WriteString(":")
-	sb.WriteString(fmt.Sprint(s.Port))
-	if len(s.Instance) > 0 {
-		if strings.ToUpper(s.Instance) != "MSSQLSERVER" {
-			sb.WriteString("/")
-			sb.WriteString(s.Instance)
+	_, err := os.Stat(cfgPath)
+	if os.IsNotExist(err) {
+		err = cfg.SaveToFile(cfgPath)
+		if err != nil {
+			fmt.Println("generate configure file fail: ", err)
+		}
+	} else {
+		err = cfg.LoadFromFile(cfgPath)
+		if err != nil {
+			fmt.Println("load configure file fail: ", err)
 		}
 	}
-	sb.WriteString("?database=")
-	sb.WriteString(s.Schema)
-	if s.TimeOut > 0 {
-		sb.WriteString("&connection+timeout=")
-		sb.WriteString(fmt.Sprint(s.TimeOut))
-	}
 
-	return sb.String()
+	return cfg
 }
 
 type TabEntityBase struct {

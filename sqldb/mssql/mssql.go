@@ -2,6 +2,7 @@ package mssql
 
 import (
 	"database/sql"
+	"fmt"
 	"github.com/ktpswjz/database/sqldb"
 	"strconv"
 	"strings"
@@ -63,6 +64,358 @@ func (s *mssql) Version() int {
 	}
 
 	return 0
+}
+
+func (s *mssql) Tables() ([]*sqldb.SqlTable, error) {
+	db, err := sql.Open(s.connection.DriverName(), s.connection.SourceName())
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	sb := &strings.Builder{}
+	sb.WriteString("select t.[name], e.[value] ")
+	sb.WriteString("from [sys].[tables] t ")
+	sb.WriteString("left join [sys].[extended_properties] e on e.[major_id] = t.[object_id] ")
+
+	query := sb.String()
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	tables := make([]*sqldb.SqlTable, 0)
+	name := ""
+	var description *string = nil
+	for rows.Next() {
+		err = rows.Scan(&name, &description)
+		if err != nil {
+			return nil, err
+		}
+
+		table := &sqldb.SqlTable{
+			Name: name,
+		}
+		if description != nil {
+			table.Description = *description
+		}
+
+		tables = append(tables, table)
+	}
+
+	return tables, nil
+}
+
+func (s *mssql) Views() ([]*sqldb.SqlTable, error) {
+	db, err := sql.Open(s.connection.DriverName(), s.connection.SourceName())
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	sb := &strings.Builder{}
+	sb.WriteString("select [name] ")
+	sb.WriteString("from [sys].[views] ")
+
+	query := sb.String()
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	tables := make([]*sqldb.SqlTable, 0)
+	name := ""
+	for rows.Next() {
+		err = rows.Scan(&name)
+		if err != nil {
+			return nil, err
+		}
+
+		table := &sqldb.SqlTable{
+			Name: name,
+		}
+
+		tables = append(tables, table)
+	}
+
+	return tables, nil
+}
+
+func (s *mssql) Columns(tableName string) ([]*sqldb.SqlColumn, error) {
+	db, err := sql.Open(s.connection.DriverName(), s.connection.SourceName())
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	// 列名 | 列说明 | 数据类型 | 长度 | 精度 | 小数位数 | 标识 | 主键 | 允许空 | 默认值
+	sql := `
+SELECT  
+        col.[name] AS 列名 ,  
+        ISNULL(ep.[value], '') AS 列说明 ,  
+        t.[name] AS 数据类型 ,  
+        col.[length] AS 长度 ,  
+		col.[xprec] AS 精度,
+        COLUMNPROPERTY(col.[id], col.[name], 'Scale') AS 小数位数 , 
+		COLUMNPROPERTY(col.[id], col.[name], 'IsIdentity') AS 标识 ,  
+        CASE WHEN EXISTS ( SELECT   1  
+                           FROM     [dbo].[sysindexes] si  
+                                    INNER JOIN [dbo].[sysindexkeys] sik ON si.[id] = sik.[id]  
+                                                              AND si.[indid] = sik.[indid]  
+                                    INNER JOIN [dbo].[syscolumns] sc ON sc.[id] = sik.[id]  
+                                                              AND sc.[colid] = sik.[colid]  
+                                    INNER JOIN [dbo].[sysobjects] so ON so.[name] = si.[name]  
+                                                              AND so.[xtype] = 'PK'  
+                           WHERE    sc.[id] = col.[id]  
+                                    AND sc.[colid] = col.[colid] ) THEN 1  
+             ELSE 0  
+        END AS 主键 ,  
+		col.[isnullable] AS 允许空 ,  
+        comm.[text] AS 默认值  
+FROM    [dbo].[syscolumns] col  
+        LEFT  JOIN [dbo].[systypes] t ON col.[xtype] = t.[xusertype]  
+        inner JOIN [dbo].[sysobjects] obj ON col.[id] = obj.[id]  
+                                         AND (obj.[xtype] = 'U'  or obj.[xtype] = 'V') 
+                                         AND obj.[status] >= 0  
+        LEFT  JOIN [dbo].[syscomments] comm ON col.[cdefault] = comm.id  
+        LEFT  JOIN [sys].[extended_properties] ep ON col.[id] = ep.[major_id]  
+                                                      AND col.[colid] = ep.[minor_id]  
+                                                      AND ep.[name] = 'MS_Description'  
+        LEFT  JOIN [sys].[extended_properties] epTwo ON obj.[id] = epTwo.[major_id]  
+                                                         AND epTwo.[minor_id] = 0  
+                                                         AND epTwo.[name] = 'MS_Description'  
+WHERE   obj.[name] = 
+`
+
+	sb := &strings.Builder{}
+	sb.WriteString(sql)
+	sb.WriteString("'")
+	sb.WriteString(tableName)
+	sb.WriteString("'")
+
+	query := sb.String()
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	columns := make([]*sqldb.SqlColumn, 0)
+	name := ""
+	var comment *string = nil
+	dataType := ""
+	length := 0
+	precision := 0
+	var scale *int = nil
+	autoIncrement := 0
+	primaryKey := 0
+	nullable := 0
+	for rows.Next() {
+		var dataDefault *string = nil
+		err = rows.Scan(&name, &comment, &dataType, &length, &precision, &scale, &autoIncrement, &primaryKey, &nullable, &dataDefault)
+		if err != nil {
+			return nil, err
+		}
+
+		column := &sqldb.SqlColumn{
+			Name:        name,
+			DataType:    dataType,
+			DataDefault: dataDefault,
+		}
+		if comment != nil {
+			column.Comment = *comment
+		}
+		if autoIncrement > 0 {
+			column.AutoIncrement = true
+		}
+		if primaryKey > 0 {
+			column.PrimaryKey = true
+		}
+		if nullable > 0 {
+			column.Nullable = true
+		}
+		if dataDefault != nil {
+			column.DataDisplay = s.columnDateDefault(*dataDefault)
+		}
+		column.Type = s.columnTypeName(dataType, length, precision, scale)
+
+		columns = append(columns, column)
+	}
+
+	return columns, nil
+}
+
+func (s *mssql) TableDefinition(table *sqldb.SqlTable) (string, error) {
+	if table == nil {
+		return "", fmt.Errorf("table is nil")
+	}
+
+	columns, err := s.Columns(table.Name)
+	if err != nil {
+		return "", err
+	}
+	columnCount := len(columns)
+	if columnCount < 1 {
+		return "", fmt.Errorf("no columns")
+	}
+
+	sb := &strings.Builder{}
+	sb.WriteString(fmt.Sprintf("IF OBJECT_ID('[dbo].[%s]') IS NOT NULL", table.Name))
+	sb.WriteString(fmt.Sprintln())
+	sb.WriteString(fmt.Sprintf("	DROP TABLE [dbo].[%s]", table.Name))
+	sb.WriteString(fmt.Sprintln())
+	sb.WriteString(fmt.Sprintln("GO"))
+
+	sb.WriteString(fmt.Sprintln())
+	sb.WriteString(fmt.Sprintf("CREATE TABLE [dbo].[%s] (", table.Name))
+	sb.WriteString(fmt.Sprintln())
+
+	primaryKeys := make([]string, 0)
+	uniqueKeys := make([]string, 0)
+	sbDefaults := &strings.Builder{}
+	sbComments := &strings.Builder{}
+	for i := 0; i < columnCount; i++ {
+		column := columns[i]
+		sb.WriteString(fmt.Sprintf("	[%s] %s ", column.Name, column.Type))
+		if column.AutoIncrement {
+			sb.WriteString("IDENTITY ")
+		}
+		if !column.Nullable {
+			sb.WriteString("NOT NULL ")
+		}
+		if i < columnCount-1 {
+			sb.WriteString(",")
+			sb.WriteString(fmt.Sprintln())
+		}
+
+		if column.PrimaryKey {
+			primaryKeys = append(primaryKeys, fmt.Sprintf("%s", column.Name))
+		}
+		if column.UniqueKey {
+			uniqueKeys = append(uniqueKeys, fmt.Sprintf("%s", column.Name))
+		}
+		if column.DataDefault != nil {
+			sbDefaults.WriteString(fmt.Sprintln())
+			sbDefaults.WriteString(fmt.Sprintf("ALTER TABLE [dbo].[%[1]s] ADD  CONSTRAINT [DF_%[1]s_%[2]s]  DEFAULT %[3]s FOR [%[2]s] ",
+				table.Name, column.Name, *column.DataDefault))
+			sbDefaults.WriteString(fmt.Sprintln())
+			sbDefaults.WriteString(fmt.Sprintln("GO"))
+		}
+		if len(column.Comment) > 0 {
+			sbComments.WriteString(fmt.Sprintln(""))
+			sbComments.WriteString(fmt.Sprintln("EXEC [sys].[sp_addextendedproperty] "))
+			sbComments.WriteString(fmt.Sprintln("	@name=N'MS_Description', "))
+			sbComments.WriteString(fmt.Sprintf("	@value=N'%s', ", column.Comment))
+			sbComments.WriteString(fmt.Sprintln())
+			sbComments.WriteString(fmt.Sprintln("	@level0type=N'SCHEMA', "))
+			sbComments.WriteString(fmt.Sprintln("	@level0name=N'dbo', "))
+			sbComments.WriteString(fmt.Sprintln("	@level1type=N'TABLE',"))
+			sbComments.WriteString(fmt.Sprintf("	@level1name=N'%s', ", table.Name))
+			sbComments.WriteString(fmt.Sprintln())
+			sbComments.WriteString(fmt.Sprintln("	@level2type=N'COLUMN',"))
+			sbComments.WriteString(fmt.Sprintf("	@level2name=N'%s' ", column.Name))
+			sbComments.WriteString(fmt.Sprintln())
+			sbComments.WriteString(fmt.Sprintln("GO"))
+		}
+	}
+	sb.WriteString(fmt.Sprintln(")"))
+	sb.WriteString(fmt.Sprintln("GO"))
+
+	if len(primaryKeys) > 0 {
+		sb.WriteString(fmt.Sprintln())
+		sb.WriteString(fmt.Sprintf("ALTER TABLE [dbo].[%s] ADD CONSTRAINT ", table.Name))
+		sb.WriteString(fmt.Sprintln())
+		sb.WriteString(fmt.Sprintf("	PK_%s PRIMARY KEY CLUSTERED ", table.Name))
+		sb.WriteString(fmt.Sprintf("(%s) ON [PRIMARY] ", strings.Join(primaryKeys, ",")))
+		sb.WriteString(fmt.Sprintln())
+		sb.WriteString(fmt.Sprintln("GO"))
+	}
+
+	sb.WriteString(sbDefaults.String())
+	sb.WriteString(sbComments.String())
+
+	if len(table.Description) > 0 {
+		sb.WriteString(fmt.Sprintln())
+		sb.WriteString(fmt.Sprintln("EXEC [sys].[sp_addextendedproperty]"))
+		sb.WriteString(fmt.Sprintln("	@name=N'MS_Description', "))
+		sb.WriteString(fmt.Sprintf("	@value=N'%s'", table.Description))
+		sb.WriteString(fmt.Sprintln(", "))
+		sb.WriteString(fmt.Sprintln("	@level0type=N'SCHEMA',"))
+		sb.WriteString(fmt.Sprintln("	@level0name=N'dbo',"))
+		sb.WriteString(fmt.Sprintln("	@level1type=N'TABLE',"))
+		sb.WriteString(fmt.Sprintf("	@level1name=N'%s'", table.Name))
+		sb.WriteString(fmt.Sprintln())
+		sb.WriteString(fmt.Sprintln("GO"))
+	}
+	sb.WriteString(fmt.Sprintln())
+
+	return sb.String(), nil
+}
+
+func (s *mssql) ViewDefinition(viewName string) (string, error) {
+	db, err := sql.Open(s.connection.DriverName(), s.connection.SourceName())
+	if err != nil {
+		return "", err
+	}
+	defer db.Close()
+
+	sb := &strings.Builder{}
+	sb.WriteString("select [definition] ")
+	sb.WriteString("from [sys].[sql_modules] ")
+	sb.WriteString(fmt.Sprintf("where [object_id] = OBJECT_ID('%s') ", viewName))
+
+	query := sb.String()
+	row := db.QueryRow(query)
+
+	definition := ""
+	err = row.Scan(&definition)
+	if err != nil {
+		return "", err
+	}
+
+	asPos := strings.Index(definition, "AS")
+	if asPos > 0 {
+		definition = definition[asPos+2:]
+	}
+
+	define := &strings.Builder{}
+	define.WriteString(fmt.Sprintf("IF OBJECT_ID('[dbo].[%s]') IS NOT NULL ", viewName))
+	define.WriteString(fmt.Sprintln(""))
+	define.WriteString(fmt.Sprintf("DROP VIEW [dbo].[%s] ", viewName))
+	define.WriteString(fmt.Sprintln(""))
+	define.WriteString(fmt.Sprintln("GO"))
+	define.WriteString(fmt.Sprintf("CREATE VIEW [dbo].[%s] AS ", viewName))
+	define.WriteString(definition)
+
+	return define.String(), nil
+}
+
+func (s *mssql) columnTypeName(dataType string, length, precision int, scale *int) string {
+	sb := &strings.Builder{}
+	sb.WriteString(dataType)
+	if scale == nil {
+		if precision == 0 {
+			sb.WriteString(fmt.Sprintf("(%d)", length))
+		}
+	} else {
+		if strings.ToLower(dataType) == "decimal" || strings.ToLower(dataType) == "numeric" {
+			sb.WriteString(fmt.Sprintf("(%d, %d)", precision, *scale))
+		}
+	}
+
+	return sb.String()
+}
+
+func (s *mssql) columnDateDefault(value string) string {
+	if strings.HasPrefix(value, "((") && strings.HasSuffix(value, "))") {
+		return value[2 : len(value)-2]
+	} else if strings.HasPrefix(value, "(N'") && strings.HasSuffix(value, "')") {
+		return value[3 : len(value)-2]
+	}
+
+	return value
 }
 
 func (s *mssql) NewAccess(transactional bool) (sqldb.SqlAccess, error) {

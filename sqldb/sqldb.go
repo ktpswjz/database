@@ -7,10 +7,14 @@ import (
 type SqlConnection interface {
 	DriverName() string
 	SourceName() string
+	SchemaName() string
 }
 
 type SqlDatabase interface {
 	Test() (string, error)
+	Tables() ([]*SqlTable, error)
+	Views() ([]*SqlTable, error)
+	Columns(tableName string) ([]*SqlColumn, error)
 
 	NewAccess(transactional bool) (SqlAccess, error)
 	NewEntity() SqlEntity
@@ -107,4 +111,24 @@ type SqlFilter interface {
 	FieldOr() bool
 	GroupOr() bool
 	Fields() interface{}
+}
+
+type SqlTable struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+type SqlColumn struct {
+	Name    string `json:"name" note:"名称"`
+	Type    string `json:"type" note:"类型"`
+	Comment string `json:"comment" note:"说明"`
+
+	Nullable      bool `json:"nullable" note:"是否可空"`
+	PrimaryKey    bool `json:"primaryKey" note:"是否主键"`
+	UniqueKey     bool `json:"uniqueKey" note:"是否唯一"`
+	AutoIncrement bool `json:"autoIncrement" note:"是否自增长"`
+
+	DataType    string  `json:"dataType" note:"数据类型"`
+	DataDefault *string `json:"dataDefault" note:"数据默认值"`
+	DataDisplay string  `json:"dataDisplay" note:"数据默认值显示"`
 }
