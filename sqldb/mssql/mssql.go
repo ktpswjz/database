@@ -76,7 +76,7 @@ func (s *mssql) Tables() ([]*sqldb.SqlTable, error) {
 	sb := &strings.Builder{}
 	sb.WriteString("select t.[name], e.[value] ")
 	sb.WriteString("from [sys].[tables] t ")
-	sb.WriteString("left join [sys].[extended_properties] e on e.[major_id] = t.[object_id] ")
+	sb.WriteString("left join [sys].[extended_properties] e on e.[major_id] = t.[object_id] and e.[minor_id] = 0 ")
 
 	query := sb.String()
 	rows, err := db.Query(query)

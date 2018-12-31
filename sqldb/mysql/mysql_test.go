@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"strings"
 )
 
 func TestTest(t *testing.T) {
@@ -94,6 +95,10 @@ func TestMysql_ViewDefinition(t *testing.T) {
 
 func testConnection() *Connection {
 	goPath := os.Getenv("GOPATH")
+	paths := strings.Split(goPath, ";")
+	if len(paths) > 1 {
+		goPath = paths[0]
+	}
 	cfgPath := filepath.Join(goPath, "tmp", "cfg", "database_mysql_test.json")
 	cfg := &Connection{
 		Server:   "172.0.0.1",

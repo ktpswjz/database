@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"strings"
 )
 
 func TestTest(t *testing.T) {
@@ -138,6 +139,10 @@ func TestMssql_SelectPage(t *testing.T) {
 
 func testConnection() *Connection {
 	goPath := os.Getenv("GOPATH")
+	paths := strings.Split(goPath, ";")
+	if len(paths) > 1 {
+		goPath = paths[0]
+	}
 	cfgPath := filepath.Join(goPath, "tmp", "cfg", "database_mssql_test.json")
 	cfg := &Connection{
 		Server:   "127.0.0.1",
